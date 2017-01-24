@@ -27,16 +27,18 @@ public class TrackingController implements PositionProvider.PositionListener, Ne
 
     private static final String TAG = TrackingController.class.getSimpleName();
     private static final int RETRY_DELAY = 30 * 1000;
-    private static final int WAKE_LOCK_TIMEOUT = 60 * 1000;
+    private static final int WAKE_LOCK_TIMEOUT = 120 * 1000;
 
     private boolean isOnline;
     private boolean isWaiting;
 
     private Context context;
     private Handler handler;
+    private SharedPreferences preferences;
 
     private String address;
     private int port;
+    private boolean secure;
 
     private PositionProvider positionProvider;
     private DatabaseHelper databaseHelper;
@@ -61,8 +63,8 @@ public class TrackingController implements PositionProvider.PositionListener, Ne
     public TrackingController(Context context) {
         this.context = context;
         handler = new Handler();
-        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
-        if (preferences.getString(MainActivity.KEY_PROVIDER, null).equals("mixed")) {
+        preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        if (preferences.getString(MainActivity.KEY_PROVIDER, "gps").equals("mixed")) {
             positionProvider = new MixedPositionProvider(context, this);
         } else {
             positionProvider = new SimplePositionProvider(context, this);
@@ -73,6 +75,7 @@ public class TrackingController implements PositionProvider.PositionListener, Ne
 
         address = preferences.getString(MainActivity.KEY_ADDRESS, null);
         port = Integer.parseInt(preferences.getString(MainActivity.KEY_PORT, null));
+        secure = preferences.getBoolean(MainActivity.KEY_SECURE, false);
 
         PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, getClass().getName());
@@ -82,13 +85,21 @@ public class TrackingController implements PositionProvider.PositionListener, Ne
         if (isOnline) {
             read();
         }
-        positionProvider.startUpdates();
+        try {
+            positionProvider.startUpdates();
+        } catch (SecurityException e) {
+            Log.w(TAG, e);
+        }
         networkManager.start();
     }
 
     public void stop() {
         networkManager.stop();
-        positionProvider.stopUpdates();
+        try {
+            positionProvider.stopUpdates();
+        } catch (SecurityException e) {
+            Log.w(TAG, e);
+        }
         handler.removeCallbacksAndMessages(null);
     }
 
@@ -153,7 +164,11 @@ public class TrackingController implements PositionProvider.PositionListener, Ne
             public void onComplete(boolean success, Position result) {
                 if (success) {
                     if (result != null) {
-                        send(result);
+                        if (result.getDeviceId().equals(preferences.getString(MainActivity.KEY_DEVICE, null))) {
+                            send(result);
+                        } else {
+                            delete(result);
+                        }
                     } else {
                         isWaiting = true;
                     }
@@ -184,7 +199,7 @@ public class TrackingController implements PositionProvider.PositionListener, Ne
     private void send(final Position position) {
         log("send", position);
         lock();
-        String request = ProtocolFormatter.formatRequest(address, port, position);
+        String request = ProtocolFormatter.formatRequest(address, port, secure, position);
         RequestManager.sendRequestAsync(request, new RequestManager.RequestHandler() {
             @Override
             public void onComplete(boolean success) {

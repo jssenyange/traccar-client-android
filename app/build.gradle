@@ -1,23 +1,18 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 23
-    buildToolsVersion '23.0.1'
+    compileSdkVersion 25
+    buildToolsVersion '25.0.2'
 
     defaultConfig {
         minSdkVersion 3
-        targetSdkVersion 23
-        versionCode 27
-        versionName '3.7'
+        targetSdkVersion 25
+        versionCode 33
+        versionName '4.0'
     }
 
-    signingConfigs {
-        release {
-            storeFile file('../../android.keystore')
-            keyAlias 'tananaev'
-            storePassword ''
-            keyPassword ''
-        }
+    lintOptions {
+        checkReleaseBuilds false
     }
 
     productFlavors {
@@ -34,7 +29,7 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            signingConfig signingConfigs.release
+            proguardFiles getDefaultProguardFile('proguard-android.txt')
         }
     }
 }
@@ -42,15 +37,4 @@ android {
 dependencies {
     testCompile 'junit:junit:4.12'
     testCompile 'org.robolectric:robolectric:3.0'
-}
-
-task requestPasswords << {
-    android.signingConfigs.release.storePassword = new String(System.console().readPassword('\nStore password: '))
-    android.signingConfigs.release.keyPassword = new String(System.console().readPassword('Key password: '))
-}
-
-tasks.whenTaskAdded { theTask ->
-    if (theTask.name.equals('packageRegularRelease') || theTask.name.equals('packageHiddenRelease')) {
-        theTask.dependsOn 'requestPasswords'
-    }
 }

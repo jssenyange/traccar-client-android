@@ -55,9 +55,9 @@ public abstract class PositionProvider {
         locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
 
         deviceId = preferences.getString(MainActivity.KEY_DEVICE, null);
-        period = Integer.parseInt(preferences.getString(MainActivity.KEY_INTERVAL, null)) * 1000;
+        period = Long.parseLong(preferences.getString(MainActivity.KEY_INTERVAL, null)) * 1000;
 
-        type = preferences.getString(MainActivity.KEY_PROVIDER, null);
+        type = preferences.getString(MainActivity.KEY_PROVIDER, "gps");
     }
 
     public abstract void startUpdates();
@@ -65,17 +65,17 @@ public abstract class PositionProvider {
     public abstract void stopUpdates();
 
     protected void updateLocation(Location location) {
-        if (location != null && location.getTime() != lastUpdateTime) {
+        if (location != null && location.getTime() - lastUpdateTime >= period) {
             Log.i(TAG, "location new");
             lastUpdateTime = location.getTime();
-            listener.onPositionUpdate(new Position(deviceId, location, getBatteryLevel()));
+            listener.onPositionUpdate(new Position(deviceId, location, getBatteryLevel(context)));
         } else {
             Log.i(TAG, location != null ? "location old" : "location nil");
         }
     }
 
     @TargetApi(Build.VERSION_CODES.ECLAIR)
-    private double getBatteryLevel() {
+    public static double getBatteryLevel(Context context) {
         if (android.os.Build.VERSION.SDK_INT > Build.VERSION_CODES.ECLAIR) {
             Intent batteryIntent = context.registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
             int level = batteryIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, 0);

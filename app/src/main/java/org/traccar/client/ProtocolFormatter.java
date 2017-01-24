@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2015 Anton Tananaev (anton.tananaev@gmail.com)
+ * Copyright 2012 - 2016 Anton Tananaev (anton.tananaev@gmail.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,15 +15,18 @@
  */
 package org.traccar.client;
 
-import android.location.Location;
 import android.net.Uri;
 
 public class ProtocolFormatter {
 
-    public static String formatRequest(String address, int port, Position position) {
+    public static String formatRequest(String address, int port, boolean secure, Position position) {
+        return formatRequest(address, port, secure, position, null);
+    }
+
+    public static String formatRequest(String address, int port, boolean secure, Position position, String alarm) {
 
         Uri.Builder builder = new Uri.Builder();
-        builder.scheme("http").encodedAuthority(address + ':' + port)
+        builder.scheme(secure ? "https" : "http").encodedAuthority(address + ':' + port)
                 .appendQueryParameter("id", position.getDeviceId())
                 .appendQueryParameter("timestamp", String.valueOf(position.getTime().getTime() / 1000))
                 .appendQueryParameter("lat", String.valueOf(position.getLatitude()))
@@ -32,6 +35,10 @@ public class ProtocolFormatter {
                 .appendQueryParameter("bearing", String.valueOf(position.getCourse()))
                 .appendQueryParameter("altitude", String.valueOf(position.getAltitude()))
                 .appendQueryParameter("batt", String.valueOf(position.getBattery()));
+
+        if (alarm != null) {
+            builder.appendQueryParameter("alarm", alarm);
+        }
 
         return builder.build().toString();
     }
