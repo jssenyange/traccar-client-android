@@ -15,7 +15,6 @@
  */
 package org.traccar.client;
 
-import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -23,27 +22,81 @@ import android.location.Location;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
+import android.support.annotation.DrawableRes;
+import android.support.v4.content.ContextCompat;
+import android.support.v4.content.pm.ShortcutInfoCompat;
+import android.support.v4.content.pm.ShortcutManagerCompat;
+import android.support.v4.graphics.drawable.IconCompat;
+import android.support.v7.app.AppCompatActivity;
+import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.ListView;
 import android.widget.Toast;
 
-public class ShortcutActivity extends Activity {
+public class ShortcutActivity extends AppCompatActivity {
 
     public static final String EXTRA_ACTION = "action";
-    public static final String EXTRA_ACTION_START = "start";
-    public static final String EXTRA_ACTION_STOP = "stop";
-    public static final String EXTRA_ACTION_SOS = "sos";
+    public static final String ACTION_START = "start";
+    public static final String ACTION_STOP = "stop";
+    public static final String ACTION_SOS = "sos";
 
     private static final String ALARM_SOS = "sos";
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        checkShortcutAction(getIntent());
+        if (!executeAction(getIntent())) {
+            setContentView(R.layout.list);
+
+            final String[] items = new String[] {
+                    getString(R.string.shortcut_start),
+                    getString(R.string.shortcut_stop),
+                    getString(R.string.shortcut_sos)
+            };
+
+            ListView listView = findViewById(android.R.id.list);
+
+            listView.setAdapter(new ArrayAdapter<>(
+                    this, android.R.layout.simple_list_item_1, items));
+
+            listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+                @Override
+                public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                    switch (position) {
+                        case 0:
+                            setShortcutResult(items[position], R.mipmap.ic_start, ACTION_START);
+                            break;
+                        case 1:
+                            setShortcutResult(items[position], R.mipmap.ic_stop, ACTION_STOP);
+                            break;
+                        case 2:
+                            setShortcutResult(items[position], R.mipmap.ic_sos, ACTION_SOS);
+                            break;
+                    }
+                    finish();
+                }
+            });
+        }
     }
 
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        checkShortcutAction(intent);
+        executeAction(intent);
+    }
+
+    private void setShortcutResult(String label, @DrawableRes int iconResId, String action) {
+        Intent intent = new Intent(Intent.ACTION_DEFAULT, null, this, ShortcutActivity.class);
+        intent.putExtra(EXTRA_ACTION, action);
+
+        ShortcutInfoCompat shortcut = new ShortcutInfoCompat.Builder(this, action)
+                .setShortLabel(label)
+                .setIcon(IconCompat.createWithResource(this, iconResId))
+                .setIntent(intent)
+                .build();
+
+        setResult(RESULT_OK, ShortcutManagerCompat.createShortcutResultIntent(this, shortcut));
     }
 
     @SuppressWarnings("MissingPermission")
@@ -60,14 +113,11 @@ public class ShortcutActivity extends Activity {
         if (location != null) {
 
             Position position = new Position(
-                    preferences.getString(MainActivity.KEY_DEVICE, null),
+                    preferences.getString(MainFragment.KEY_DEVICE, null),
                     location, PositionProvider.getBatteryLevel(this));
 
             String request = ProtocolFormatter.formatRequest(
-                    preferences.getString(MainActivity.KEY_ADDRESS, null),
-                    Integer.parseInt(preferences.getString(MainActivity.KEY_PORT, null)),
-                    preferences.getBoolean(MainActivity.KEY_SECURE, false),
-                    position, ALARM_SOS);
+                    preferences.getString(MainFragment.KEY_URL, null), position, ALARM_SOS);
 
             RequestManager.sendRequestAsync(request, new RequestManager.RequestHandler() {
                 @Override
@@ -85,34 +135,35 @@ public class ShortcutActivity extends Activity {
         }
     }
 
-    private void checkShortcutAction(Intent intent) {
+    private boolean executeAction(Intent intent) {
         String action;
         if (intent.hasExtra("shortcutAction")) {
             action = intent.getBooleanExtra("shortcutAction", false)
-                    ? EXTRA_ACTION_START : EXTRA_ACTION_STOP;
+                    ? ACTION_START : ACTION_STOP;
         } else {
             action = intent.getStringExtra(EXTRA_ACTION);
         }
         if (action != null) {
             switch (action) {
-                case EXTRA_ACTION_START:
+                case ACTION_START:
                     PreferenceManager.getDefaultSharedPreferences(this)
-                            .edit().putBoolean(MainActivity.KEY_STATUS, true).commit();
-                    startService(new Intent(this, TrackingService.class));
+                            .edit().putBoolean(MainFragment.KEY_STATUS, true).apply();
+                    ContextCompat.startForegroundService(this, new Intent(this, TrackingService.class));
                     Toast.makeText(this, R.string.status_service_create, Toast.LENGTH_SHORT).show();
                     break;
-                case EXTRA_ACTION_STOP:
+                case ACTION_STOP:
                     PreferenceManager.getDefaultSharedPreferences(this)
-                            .edit().putBoolean(MainActivity.KEY_STATUS, false).commit();
+                            .edit().putBoolean(MainFragment.KEY_STATUS, false).apply();
                     stopService(new Intent(this, TrackingService.class));
                     Toast.makeText(this, R.string.status_service_destroy, Toast.LENGTH_SHORT).show();
                     break;
-                case EXTRA_ACTION_SOS:
+                case ACTION_SOS:
                     sendAlarm();
                     break;
             }
+            finish();
         }
-        finish();
+        return action != null;
     }
 
 }

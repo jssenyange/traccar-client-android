@@ -17,7 +17,6 @@ package org.traccar.client;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.os.Build;
 import android.os.Handler;
 import android.os.PowerManager;
 import android.preference.PreferenceManager;
@@ -36,9 +35,7 @@ public class TrackingController implements PositionProvider.PositionListener, Ne
     private Handler handler;
     private SharedPreferences preferences;
 
-    private String address;
-    private int port;
-    private boolean secure;
+    private String url;
 
     private PositionProvider positionProvider;
     private DatabaseHelper databaseHelper;
@@ -47,11 +44,7 @@ public class TrackingController implements PositionProvider.PositionListener, Ne
     private PowerManager.WakeLock wakeLock;
 
     private void lock() {
-        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.GINGERBREAD_MR1) {
-            wakeLock.acquire();
-        } else {
-            wakeLock.acquire(WAKE_LOCK_TIMEOUT);
-        }
+        wakeLock.acquire(WAKE_LOCK_TIMEOUT);
     }
 
     private void unlock() {
@@ -64,7 +57,7 @@ public class TrackingController implements PositionProvider.PositionListener, Ne
         this.context = context;
         handler = new Handler();
         preferences = PreferenceManager.getDefaultSharedPreferences(context);
-        if (preferences.getString(MainActivity.KEY_PROVIDER, "gps").equals("mixed")) {
+        if (preferences.getString(MainFragment.KEY_PROVIDER, "gps").equals("mixed")) {
             positionProvider = new MixedPositionProvider(context, this);
         } else {
             positionProvider = new SimplePositionProvider(context, this);
@@ -73,9 +66,7 @@ public class TrackingController implements PositionProvider.PositionListener, Ne
         networkManager = new NetworkManager(context, this);
         isOnline = networkManager.isOnline();
 
-        address = preferences.getString(MainActivity.KEY_ADDRESS, null);
-        port = Integer.parseInt(preferences.getString(MainActivity.KEY_PORT, null));
-        secure = preferences.getBoolean(MainActivity.KEY_SECURE, false);
+        url = preferences.getString(MainFragment.KEY_URL, context.getString(R.string.settings_url_default_value));
 
         PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, getClass().getName());
@@ -164,7 +155,7 @@ public class TrackingController implements PositionProvider.PositionListener, Ne
             public void onComplete(boolean success, Position result) {
                 if (success) {
                     if (result != null) {
-                        if (result.getDeviceId().equals(preferences.getString(MainActivity.KEY_DEVICE, null))) {
+                        if (result.getDeviceId().equals(preferences.getString(MainFragment.KEY_DEVICE, null))) {
                             send(result);
                         } else {
                             delete(result);
@@ -199,7 +190,7 @@ public class TrackingController implements PositionProvider.PositionListener, Ne
     private void send(final Position position) {
         log("send", position);
         lock();
-        String request = ProtocolFormatter.formatRequest(address, port, secure, position);
+        String request = ProtocolFormatter.formatRequest(url, position);
         RequestManager.sendRequestAsync(request, new RequestManager.RequestHandler() {
             @Override
             public void onComplete(boolean success) {

@@ -1,12 +1,11 @@
 
 package org.traccar.client;
 
-import android.database.sqlite.SQLiteDatabase;
 import android.location.Location;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.RobolectricGradleTestRunner;
+import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
 
@@ -15,7 +14,7 @@ import java.util.Date;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
-@RunWith(RobolectricGradleTestRunner.class)
+@RunWith(RobolectricTestRunner.class)
 @Config(constants = BuildConfig.class, sdk = 21)
 public class DatabaseHelperTest {
 
@@ -23,8 +22,6 @@ public class DatabaseHelperTest {
     public void test() throws Exception {
 
         DatabaseHelper databaseHelper = new DatabaseHelper(RuntimeEnvironment.application);
-
-        SQLiteDatabase db = databaseHelper.getWritableDatabase();
 
         Position position = new Position("123456789012345", new Location("gps"), 0);
         position.setTime(new Date(0));

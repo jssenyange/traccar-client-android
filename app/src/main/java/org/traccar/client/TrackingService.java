@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2015 Anton Tananaev (anton.tananaev@gmail.com)
+ * Copyright 2012 - 2017 Anton Tananaev (anton.tananaev@gmail.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,10 +23,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.os.IBinder;
+import android.support.v4.app.NotificationCompat;
+import android.support.v4.content.ContextCompat;
 import android.util.Log;
-
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 
 public class TrackingService extends Service {
 
@@ -35,35 +34,14 @@ public class TrackingService extends Service {
 
     private TrackingController trackingController;
 
-    @SuppressWarnings("deprecation")
     private static Notification createNotification(Context context) {
         PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, new Intent(context, MainActivity.class), 0);
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-
-            return new Notification.Builder(context)
+        return new NotificationCompat.Builder(context, MainApplication.PRIMARY_CHANNEL)
                 .setContentTitle(context.getString(R.string.app_name))
                 .setContentText(context.getString(R.string.settings_status_on_summary))
                 .setContentIntent(pendingIntent)
-                .setPriority(Notification.PRIORITY_MIN)
+                .setPriority(NotificationCompat.PRIORITY_MIN)
                 .build();
-
-        } else {
-
-            Notification notification = new Notification(android.R.drawable.stat_notify_sync_noanim, null, 0);
-            try {
-                Method method = notification.getClass().getMethod("setLatestEventInfo", Context.class, CharSequence.class, CharSequence.class, PendingIntent.class);
-                try {
-                    method.invoke(notification, context, context.getString(R.string.app_name), context.getString(R.string.settings_status_on_summary), pendingIntent);
-                } catch (IllegalArgumentException | IllegalAccessException | InvocationTargetException e) {
-                    Log.w(TAG, e);
-                }
-            } catch (SecurityException | NoSuchMethodException e) {
-                Log.w(TAG, e);
-            }
-            return notification;
-
-        }
     }
 
     @TargetApi(Build.VERSION_CODES.ECLAIR)
@@ -94,10 +72,8 @@ public class TrackingService extends Service {
         trackingController = new TrackingController(this);
         trackingController.start();
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ECLAIR) {
-            startForeground(NOTIFICATION_ID, createNotification(this));
-            startService(new Intent(this, HideNotificationService.class));
-        }
+        startForeground(NOTIFICATION_ID, createNotification(this));
+        ContextCompat.startForegroundService(this, new Intent(this, HideNotificationService.class));
     }
 
     @Override
@@ -105,18 +81,12 @@ public class TrackingService extends Service {
         return null;
     }
 
-    @SuppressWarnings("deprecation")
-    @Override
-    public void onStart(Intent intent, int startId) {
-        if (intent != null) {
-            AutostartReceiver.completeWakefulIntent(intent);
-        }
-    }
-
     @TargetApi(Build.VERSION_CODES.ECLAIR)
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        onStart(intent, startId);
+        if (intent != null) {
+            AutostartReceiver.completeWakefulIntent(intent);
+        }
         return START_STICKY;
     }
 
@@ -125,9 +95,7 @@ public class TrackingService extends Service {
         Log.i(TAG, "service destroy");
         StatusActivity.addMessage(getString(R.string.status_service_destroy));
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ECLAIR) {
-            stopForeground(true);
-        }
+        stopForeground(true);
 
         if (trackingController != null) {
             trackingController.stop();
